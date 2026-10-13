@@ -1,14 +1,23 @@
 {
+  "sync_mode": "web",
   "minimap_size_mode": "Medium",
   "minimap_opacity": 1.0,
   "minimap_brightness": 0.76,
   "fullmap_brightness": 0.59,
   "entity_icon_scale": 1.0,
+  "party_room": {
+    "code": "ISLE77",
+    "player_name": ".xda_7",
+    "is_host": false,
+    "remote_hosts": [
+      "223.204.201.211"
+    ]
+  },
   "telemetry": {
     "api_url": "https://api.voice-island.com/api/players",
     "cookie_header": "si-consent=v1:granted:1791786069; si-vid=2cfd2f30-c76b-4bfe-918c-51083714c32d; si-session=eyJpZCI6Ijg2MTg2ODQ1OTYxMjA0NTM1MiIsInVzZXJuYW1lIjoiLnhkYV83IiwiZGlzY3JpbWluYXRvciI6IjAiLCJhdmF0YXIiOiJmYzVmYWQyZjZiOWNjMTk1NGU3YTUyNTkwYzg2YjYzMSIsImlzQWRtaW4iOmZhbHNlfQ.Dfpoog6B7g5Cx5CQk_k9TEtA7cv_lBuMVJgIDLBNPqc; cf_clearance=pf2mr5Lx4j_qZO3uRrQnBXv0gbGk3aLNPyRLmToi1Ok-1791792341-1.2.1.1-n08kM5v3oZXgnpYW3sDGtcS2zHjGwjGz85I48kqaF0z9Ok8mB9YMkGeQSo5JICE3gK.eS4HnSF56fRBTJkRxgzF6GLgw0kcGR_QiwtLmcylGaTlZkwvBEM.D4X0x2vPZTiqUsWB8UBGVtnE27fsbe9BQCp1vrRrjDrxfR44MyXlKYh1CVPqjUPjP65OWWJCQqrq0I.sWaXh0_Xz1NP6nPS5DMbzjTotT9LUw3f5UpaDHah8PlA1UXT8KrQM_NxNIQJQ9Y3iPxeUM35KlJZecGXHfuzFJSomBssTRwQFZYKYxg8CeyaDni3OzHngkNrZSxmDXTJdElelyAvJERnW18rqhyownow_tksl95sOaIho; si-sid=b7b59310-30ab-44bc-8ac0-f96285120d14",
     "auth_token": "",
-    "interval_sec": 3.0
+    "interval_sec": 1.0
   },
   "layers": {
     "show_zones": true,
@@ -19,7 +28,7 @@
   "active_food_categories": [],
   "active_zone_categories": [
     "patrol",
-    "migration",
-    "sanctuary"
+    "sanctuary",
+    "migration"
   ]
 }
