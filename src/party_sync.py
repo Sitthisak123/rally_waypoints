@@ -112,10 +112,20 @@ class PartySyncNode:
 
         try:
             msg_bytes = json.dumps(payload).encode("utf-8")
-            # 1. ส่งผ่าน LAN Broadcast (255.255.255.255)
-            self._sock.sendto(msg_bytes, ("<broadcast>", self.port))
+            # 1. ส่งผ่าน Global Broadcast
+            try:
+                self._sock.sendto(msg_bytes, ("<broadcast>", self.port))
+            except Exception:
+                pass
 
-            # 2. ส่งตรงไปยัง Peer IPs ที่ระบุเพิ่มเติม (เช่น Tailscale / Radmin VPN / WAN IP)
+            # 2. ส่งผ่าน Subnet Broadcast ของวงเครือข่ายเสมือน (ZeroTier / VPN)
+            for b_ip in ("172.24.255.255", "192.168.1.255", "255.255.255.255"):
+                try:
+                    self._sock.sendto(msg_bytes, (b_ip, self.port))
+                except Exception:
+                    pass
+
+            # 3. ส่งตรงไปยัง Peer IPs ที่ระบุเพิ่มเติม (ZeroTier / Tailscale / Radmin VPN / Direct IP)
             for host in self.remote_hosts:
                 h = host.strip()
                 if h:
@@ -176,7 +186,11 @@ class PartySyncNode:
                 return
 
             # ตรวจสอบ Party PIN / Room Code
-            if pkt.get("party_code") != self.party_code:
+            pkt_code = str(pkt.get("party_code", "")).strip().upper()
+            if pkt_code != self.party_code:
+                # Debug log แจ้งเตือนเมื่อมีเพื่อนส่งมาแต่รหัสห้องไม่ตรงกัน
+                sender_name = pkt.get("name", "Unknown")
+                print(f"[PartySync] Received packet from {addr[0]} ({sender_name}) with mismatched code '{pkt_code}' (local is '{self.party_code}')")
                 return
 
             sender_id = pkt.get("sender_id")
