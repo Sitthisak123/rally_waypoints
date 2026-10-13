@@ -32,6 +32,7 @@ try:
     from src.hotkeys import GlobalHotkeyListener
     from src.layers_manager import GatewayLayersManager
     from src.party_sync import PartySyncNode
+    from src.voice_island_bridge import VoiceIslandInputBridge
 except ImportError:
     from engine import (
         GatewayProjection,
@@ -45,6 +46,7 @@ except ImportError:
     from hotkeys import GlobalHotkeyListener
     from layers_manager import GatewayLayersManager
     from party_sync import PartySyncNode
+    from voice_island_bridge import VoiceIslandInputBridge
 
 
 def get_base_dir() -> str:
@@ -230,7 +232,10 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
         self.sig_zoom_out.connect(self.zoom_out)
         self.sig_exit.connect(self.exit_application)
 
-        # Global Hotkey Listener (M: กดค้าง 1 วินาทีเพื่อเปิด, กด M หรือ ESC เพื่อปิด, 8: ออกจากโปรแกรม)
+        # Voice Island Input Bridge (ส่ง PTT Key 'V' ตรงไปยัง Voice Island แม้อยู่ในเกม)
+        self.vi_bridge = VoiceIslandInputBridge(target_window_title="Voice Island", ptt_key="v")
+
+        # Global Hotkey Listener (M: กดค้าง 1 วินาทีเพื่อเปิด, กด M หรือ ESC เพื่อปิด, 8: ออกจากโปรแกรม, V: Voice Island PTT)
         self.hotkeys = GlobalHotkeyListener(
             on_toggle_interactive=self.sig_toggle_interactive.emit,
             on_toggle_minimap=self.sig_toggle_minimap.emit,
@@ -239,7 +244,9 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
             on_m_hold_open=self.sig_open_interactive.emit,
             on_m_quick_close=self.sig_close_interactive.emit,
             is_interactive_check=lambda: self.is_interactive,
-            on_exit=self.sig_exit.emit
+            on_exit=self.sig_exit.emit,
+            on_ptt_down=self.vi_bridge.send_key_down,
+            on_ptt_up=self.vi_bridge.send_key_up
         )
         self.hotkeys.start()
 

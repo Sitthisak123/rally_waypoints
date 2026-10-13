@@ -21,7 +21,9 @@ class GlobalHotkeyListener:
         on_m_hold_open: Optional[Callable[[], None]] = None,
         on_m_quick_close: Optional[Callable[[], None]] = None,
         is_interactive_check: Optional[Callable[[], bool]] = None,
-        on_exit: Optional[Callable[[], None]] = None
+        on_exit: Optional[Callable[[], None]] = None,
+        on_ptt_down: Optional[Callable[[], None]] = None,
+        on_ptt_up: Optional[Callable[[], None]] = None
     ):
         self.on_toggle_interactive = on_toggle_interactive
         self.on_toggle_minimap = on_toggle_minimap
@@ -31,6 +33,8 @@ class GlobalHotkeyListener:
         self.on_m_quick_close = on_m_quick_close
         self.is_interactive_check = is_interactive_check
         self.on_exit = on_exit
+        self.on_ptt_down = on_ptt_down
+        self.on_ptt_up = on_ptt_up
 
         self.is_running = False
         self._thread = None
@@ -81,6 +85,7 @@ class GlobalHotkeyListener:
 
         VK_ESCAPE = 0x1B
         VK_M = 0x4D
+        VK_V = 0x56
         VK_8 = 0x38  # Top-row number key 8
         VK_NUMPAD8 = 0x68  # Numpad 8
         VK_F7 = 0x76
@@ -172,6 +177,14 @@ class GlobalHotkeyListener:
                         self._last_trigger["M_CLOSE"] = time.time()
                         self._m_hold_triggered = False
 
+            elif vk == VK_V:
+                if is_down:
+                    if self.on_ptt_down:
+                        self.on_ptt_down()
+                elif is_up:
+                    if self.on_ptt_up:
+                        self.on_ptt_up()
+
             elif is_down:
                 if vk == VK_F7 and self._debounce("F7"):
                     self.on_toggle_minimap()
@@ -209,6 +222,7 @@ class GlobalHotkeyListener:
         # Polling fallback thread (ช่วยเสริมกรณีเกมบล็อค Low-Level Hook หรือ Hook หลุด)
         prev_states = {
             VK_M: False,
+            VK_V: False,
             VK_ESCAPE: False,
             VK_8: False,
             VK_NUMPAD8: False,
@@ -340,6 +354,14 @@ class GlobalHotkeyListener:
                                             if self._m_hold_triggered:
                                                 self._last_trigger["M_CLOSE"] = time.time()
                                                 self._m_hold_triggered = False
+
+                                    elif event.code == ecodes.KEY_V:
+                                        if event.value == 1:  # Key Down
+                                            if self.on_ptt_down:
+                                                self.on_ptt_down()
+                                        elif event.value == 0:  # Key Up
+                                            if self.on_ptt_up:
+                                                self.on_ptt_up()
 
                                     elif event.value == 1:
                                         if event.code in (ecodes.KEY_8, ecodes.KEY_KP8):
