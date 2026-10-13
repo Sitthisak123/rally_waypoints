@@ -232,8 +232,8 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
         self.sig_zoom_out.connect(self.zoom_out)
         self.sig_exit.connect(self.exit_application)
 
-        # Voice Island Input Bridge (ส่ง PTT Key 'V' ตรงไปยัง Voice Island แม้อยู่ในเกม)
-        self.vi_bridge = VoiceIslandInputBridge(target_window_title="Voice Island", ptt_key="v")
+        # Voice Island Input Bridge (ส่ง PTT Key 'V' ตรงไปยัง Voice Island แม้อยู่ในเกม - รองรับ "Voice Island v*" / "Voice Island v0.2.5")
+        self.vi_bridge = VoiceIslandInputBridge(target_window_title="Voice Island v*", ptt_key="v")
 
         # Global Hotkey Listener (M: กดค้าง 1 วินาทีเพื่อเปิด, กด M หรือ ESC เพื่อปิด, 8: ออกจากโปรแกรม, V: Voice Island PTT)
         self.hotkeys = GlobalHotkeyListener(
