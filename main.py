@@ -172,10 +172,13 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
 
         # Live Session & Telemetry Config (Mode: "web" or "party_room")
         self.sync_mode = "party_room"  # "web" หรือ "party_room"
-        self.party_code = "ISLE77"
+        self.party_code = "ISLE123"
         self.party_player_name = ".xda_7"
         self.party_is_host = True
+        self.party_port = 39820
         self.party_remote_hosts: List[str] = []
+        self.party_sync_waypoints = True
+        self.party_sync_playerpoint = True
         self.telemetry_api_url = "https://api.voice-island.com/api/players"
         self.telemetry_cookie = ""
         self.telemetry_token = ""
@@ -258,17 +261,20 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
             auth_token=self.telemetry_token
         )
 
-        # Private Party Sync Node (LAN / P2P / VPN Mode)
+        # Private Party Sync Node (ZeroTier / LAN / VPN Mode)
         self.party_node = PartySyncNode(
             player_id=self.local_player_id,
             player_name=self.party_player_name,
             party_code=self.party_code,
+            port=self.party_port,
             is_host=self.party_is_host,
-            remote_hosts=self.party_remote_hosts
+            remote_hosts=self.party_remote_hosts,
+            sync_waypoints=self.party_sync_waypoints,
+            sync_playerpoint=self.party_sync_playerpoint
         )
 
         if self.sync_mode == "party_room":
-            self.party_node.start(self.on_party_received, self.on_party_status)
+            self.party_node.start(self.on_party_received, self.on_party_status, self.on_party_waypoint_received)
         else:
             self.poller.start(self.on_telemetry_received, self.on_telemetry_status)
 
@@ -327,10 +333,13 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                 # Private Party Room Config
                 party_cfg = cfg.get("party_room", {})
                 self.sync_mode = cfg.get("sync_mode", "party_room")
-                self.party_code = party_cfg.get("code", "ISLE77")
+                self.party_code = party_cfg.get("code", "ISLE123")
                 self.party_player_name = party_cfg.get("player_name", ".xda_7")
                 self.party_is_host = bool(party_cfg.get("is_host", True))
+                self.party_port = int(party_cfg.get("port", 39820))
                 self.party_remote_hosts = party_cfg.get("remote_hosts", [])
+                self.party_sync_waypoints = bool(party_cfg.get("sync_waypoints", True))
+                self.party_sync_playerpoint = bool(party_cfg.get("sync_playerpoint", True))
             except Exception as e:
                 print(f"[Error loading mini config]: {e}")
 
@@ -351,7 +360,10 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                     "code": self.party_code,
                     "player_name": self.party_player_name,
                     "is_host": self.party_is_host,
-                    "remote_hosts": self.party_remote_hosts
+                    "port": self.party_port,
+                    "remote_hosts": self.party_remote_hosts,
+                    "sync_waypoints": self.party_sync_waypoints,
+                    "sync_playerpoint": self.party_sync_playerpoint
                 },
                 "telemetry": {
                     "api_url": self.telemetry_api_url,
@@ -387,8 +399,6 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                         ))
             except Exception:
                 pass
-        if not self.waypoints:
-            self.waypoints.append(Waypoint("จุดรวมพล Gateway Center", 365.0, 366.0, "camp", "#00E5FF"))
 
     def _save_waypoints(self):
         data_dir = os.path.join(get_writable_dir(), "data")
@@ -584,6 +594,11 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                 if self.tracked_target and self.tracked_target.get("id") == target_id:
                     self.tracked_target = None
                 self._save_waypoints()
+
+                # Broadcast การลบ Waypoint ไปยังปาร์ตี้ (ZeroTier / LAN)
+                if self.sync_mode == "party_room" and self.party_sync_waypoints:
+                    self.party_node.broadcast_waypoint_event("delete", {"id": target_id})
+
                 self.hovered_waypoint = None
                 self.hovered_wp_action_rects = {}
                 self.update()
@@ -1063,24 +1078,42 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
         # Tab Widget
         tabs = QtWidgets.QTabWidget()
 
-        # ================= TAB 1: ปาร์ตี้ส่วนตัว (Party Room / PIN Code) =================
+        # ================= TAB 1: ปาร์ตี้ส่วนตัว (ZeroTier / P2P / LAN) =================
         tab_party = QtWidgets.QWidget()
         layout_party = QtWidgets.QVBoxLayout(tab_party)
 
-        lbl_party_head = QtWidgets.QLabel("🔐 ห้องปาร์ตี้ส่วนตัว (Direct P2P / LAN / VPN)")
-        lbl_party_head.setStyleSheet("font-size: 13px; color: #00FF66;")
+        lbl_party_head = QtWidgets.QLabel("🔐 ห้องปาร์ตี้ส่วนตัว (ZeroTier / Direct P2P / LAN)")
+        lbl_party_head.setStyleSheet("font-size: 13px; color: #00FF66; font-weight: bold;")
         layout_party.addWidget(lbl_party_head)
 
-        lbl_party_sub = QtWidgets.QLabel("เพื่อนทุกคนเพียงตั้ง Party Code / PIN เดียวกัน จะมองเห็นตำแหน่งและทิศทางของกันทันที โดยไม่ต้องง้อเว็บ Voice-Island:")
+        lbl_party_sub = QtWidgets.QLabel("เชื่อมต่อหากันโดยตรงผ่าน ZeroTier หรือ LAN ซิงค์ทั้งตำแหน่งผู้เล่น (Playerpoint) และหมุดนำทาง (Waypoints) แบบเรียลไทม์:")
         lbl_party_sub.setWordWrap(True)
-        lbl_party_sub.setStyleSheet("font-size: 10px; color: #CCCCCC; font-weight: normal; margin-bottom: 6px;")
+        lbl_party_sub.setStyleSheet("font-size: 10px; color: #CCCCCC; font-weight: normal; margin-bottom: 4px;")
         layout_party.addWidget(lbl_party_sub)
 
-        # Party Code / PIN
-        layout_party.addWidget(QtWidgets.QLabel("🏷️ Party Code / PIN (รหัสห้อง):"))
+        # ZeroTier Auto-detected IP status banner
+        zt_interfaces = self.party_node.get_detected_interfaces()
+        zt_ips = [f"{item['ip']} ({item['interface']})" for item in zt_interfaces]
+        lbl_zt_status = QtWidgets.QLabel(f"📡 เครือข่ายที่พบในเครื่อง: {', '.join(zt_ips) if zt_ips else 'ไม่พบ'}")
+        lbl_zt_status.setStyleSheet("background: #1F1B17; color: #00E5FF; padding: 4px 8px; border-radius: 4px; font-size: 10px;")
+        layout_party.addWidget(lbl_zt_status)
+
+        # Party Code / PIN & Port
+        code_port_box = QtWidgets.QHBoxLayout()
+        code_box = QtWidgets.QVBoxLayout()
+        code_box.addWidget(QtWidgets.QLabel("🏷️ Party Code / PIN (รหัสห้อง):"))
         txt_party_code = QtWidgets.QLineEdit(self.party_code)
-        txt_party_code.setPlaceholderText("เช่น ISLE77, DINO99")
-        layout_party.addWidget(txt_party_code)
+        txt_party_code.setPlaceholderText("เช่น ISLE123, DINO99")
+        code_box.addWidget(txt_party_code)
+        code_port_box.addLayout(code_box, stretch=3)
+
+        port_box = QtWidgets.QVBoxLayout()
+        port_box.addWidget(QtWidgets.QLabel("🔌 Port (UDP):"))
+        txt_party_port = QtWidgets.QLineEdit(str(self.party_port))
+        txt_party_port.setPlaceholderText("39820")
+        port_box.addWidget(txt_party_port)
+        code_port_box.addLayout(port_box, stretch=1)
+        layout_party.addLayout(code_port_box)
 
         # Player Name
         layout_party.addWidget(QtWidgets.QLabel("👤 ชื่อของคุณในปาร์ตี้:"))
@@ -1100,18 +1133,31 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
         role_box.addWidget(rad_join)
         layout_party.addLayout(role_box)
 
-        # Direct Peer IP (สำหรับเล่นข้ามวงเน็ต เช่น Tailscale / Radmin / IP เพื่อน)
-        layout_party.addWidget(QtWidgets.QLabel("🌐 IP เพื่อนในตี้ (ถ้าอยู่คนละวงเน็ต / Tailscale / Radmin VPN):"))
+        # Direct Peer IP (สำหรับเล่นข้ามวงเน็ต เช่น ZeroTier IP เพื่อน)
+        layout_party.addWidget(QtWidgets.QLabel("🌐 ZeroTier / Direct Peer IP เพื่อน (เช่น 172.24.165.121):"))
         txt_remote_ips = QtWidgets.QLineEdit(", ".join(self.party_remote_hosts))
-        txt_remote_ips.setPlaceholderText("เว้นว่างได้หากอยู่ใน LAN เดียวกัน (เช่น 100.64.1.2, 192.168.1.50)")
+        txt_remote_ips.setPlaceholderText("เช่น 172.24.165.121 (คั่นด้วยจุลภาคหากมีหลายคน)")
         layout_party.addWidget(txt_remote_ips)
+
+        # Full Party Config Options: Sync Checkboxes
+        sync_opts_box = QtWidgets.QHBoxLayout()
+        chk_sync_player = QtWidgets.QCheckBox("📍 ซิงค์ตำแหน่งผู้เล่น (Playerpoint)")
+        chk_sync_player.setChecked(self.party_sync_playerpoint)
+        chk_sync_player.setStyleSheet("color: #FFFFFF; font-size: 11px;")
+        sync_opts_box.addWidget(chk_sync_player)
+
+        chk_sync_wp = QtWidgets.QCheckBox("🚩 ซิงค์หมุดนำทาง (Waypoints)")
+        chk_sync_wp.setChecked(self.party_sync_waypoints)
+        chk_sync_wp.setStyleSheet("color: #FFFFFF; font-size: 11px;")
+        sync_opts_box.addWidget(chk_sync_wp)
+        layout_party.addLayout(sync_opts_box)
 
         lbl_party_status = QtWidgets.QLabel(f"สถานะปัจจุบัน: {self.telemetry_status_msg}")
         lbl_party_status.setStyleSheet("color: #00FF66; font-size: 11px;")
         layout_party.addWidget(lbl_party_status)
 
         layout_party.addStretch()
-        tabs.addTab(tab_party, "👥 ห้องปาร์ตี้ส่วนตัว (Party PIN)")
+        tabs.addTab(tab_party, "👥 ปาร์ตี้ ZeroTier / P2P")
 
         # ================= TAB 2: Live Map Web Auth (Voice-Island) =================
         tab_web = QtWidgets.QWidget()
@@ -1215,11 +1261,17 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
             self.sync_mode = "party_room" if is_party_tab else "web"
 
             # 1. บันทึกค่า Party Room
-            self.party_code = txt_party_code.text().strip().upper() or "ISLE77"
+            self.party_code = txt_party_code.text().strip().upper() or "ISLE123"
+            try:
+                self.party_port = int(txt_party_port.text().strip())
+            except ValueError:
+                self.party_port = 39820
             self.party_player_name = txt_player_name.text().strip() or ".xda_7"
             self.party_is_host = rad_host.isChecked()
             raw_ips = txt_remote_ips.text().split(",")
             self.party_remote_hosts = [ip.strip() for ip in raw_ips if ip.strip()]
+            self.party_sync_playerpoint = chk_sync_player.isChecked()
+            self.party_sync_waypoints = chk_sync_wp.isChecked()
 
             # 2. บันทึกค่า Web Telemetry
             self.telemetry_api_url = txt_url.text().strip()
@@ -1234,9 +1286,12 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                     party_code=self.party_code,
                     player_name=self.party_player_name,
                     is_host=self.party_is_host,
-                    remote_hosts=self.party_remote_hosts
+                    port=self.party_port,
+                    remote_hosts=self.party_remote_hosts,
+                    sync_waypoints=self.party_sync_waypoints,
+                    sync_playerpoint=self.party_sync_playerpoint
                 )
-                self.party_node.start(self.on_party_received, self.on_party_status)
+                self.party_node.start(self.on_party_received, self.on_party_status, self.on_party_waypoint_received)
             else:
                 self.party_node.stop()
                 self.poller.configure(
@@ -1283,6 +1338,11 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
                 new_wp = Waypoint(name.strip(), svg_x, svg_y, icon, color_map.get(icon, "#FFD600"))
                 self.waypoints.append(new_wp)
                 self._save_waypoints()
+
+                # Broadcast การสร้าง Waypoint ไปยังปาร์ตี้ (ZeroTier / LAN)
+                if self.sync_mode == "party_room" and self.party_sync_waypoints:
+                    self.party_node.broadcast_waypoint_event("add", new_wp.to_dict())
+
                 self.update()
 
     def on_telemetry_status(self, status: str, msg: str, latency: int):
@@ -1307,6 +1367,48 @@ class VoiceHUDOverlay(QtWidgets.QWidget):
             svg_y = local_p.current_pos["y"]
             gx, gy = GatewayProjection.unproject_coordinates(svg_x, svg_y)
             self.party_node.broadcast_my_position(gx, gy, local_p.heading_angle, self.self_color)
+
+    def on_party_waypoint_received(self, action: str, wp_data: Dict):
+        """รับการซิงค์ Waypoint จากเพื่อนในปาร์ตี้ (ZeroTier / LAN)"""
+        if self.sync_mode != "party_room" or not self.party_sync_waypoints:
+            return
+
+        if action == "add":
+            wid = wp_data.get("id")
+            if not wid:
+                return
+            # ตรวจสอบว่ามีอยู่แล้วหรือไม่
+            for w in self.waypoints:
+                if w.id == wid:
+                    w.name = wp_data.get("name", w.name)
+                    w.x = float(wp_data.get("x", w.x))
+                    w.y = float(wp_data.get("y", w.y))
+                    w.icon = wp_data.get("icon", w.icon)
+                    w.color = wp_data.get("color", w.color)
+                    self._save_waypoints()
+                    self.update()
+                    return
+
+            new_wp = Waypoint(
+                name=wp_data.get("name", "Party Waypoint"),
+                svg_x=float(wp_data.get("x", 0)),
+                svg_y=float(wp_data.get("y", 0)),
+                icon=wp_data.get("icon", "camp"),
+                color=wp_data.get("color", "#00E5FF"),
+                wid=wid
+            )
+            self.waypoints.append(new_wp)
+            self._save_waypoints()
+            self.update()
+
+        elif action == "delete":
+            wid = wp_data.get("id")
+            if wid:
+                self.waypoints = [w for w in self.waypoints if w.id != wid]
+                if self.tracked_target and self.tracked_target.get("id") == wid:
+                    self.tracked_target = None
+                self._save_waypoints()
+                self.update()
 
     def on_party_received(self, data: Dict):
         """เมื่อได้รับอัปเดตจาก Party Room Node"""

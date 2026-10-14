@@ -1,17 +1,20 @@
 {
-  "sync_mode": "web",
+  "sync_mode": "party_room",
   "minimap_size_mode": "Medium",
   "minimap_opacity": 1.0,
   "minimap_brightness": 0.76,
-  "fullmap_brightness": 0.59,
-  "entity_icon_scale": 1.0,
+  "fullmap_brightness": 0.6,
+  "entity_icon_scale": 0.5,
   "party_room": {
-    "code": "ISLE77",
+    "code": "ISLE123",
     "player_name": ".xda_7",
     "is_host": false,
     "remote_hosts": [
-      "223.204.201.211"
-    ]
+      "172.24.165.121"
+    ],
+    "port": 39820,
+    "sync_waypoints": true,
+    "sync_playerpoint": true
   },
   "telemetry": {
     "api_url": "https://api.voice-island.com/api/players",
@@ -21,14 +24,14 @@
   },
   "layers": {
     "show_zones": true,
-    "show_items": false,
+    "show_items": true,
     "show_labels_region": false,
     "show_food": false
   },
   "active_food_categories": [],
   "active_zone_categories": [
-    "patrol",
     "sanctuary",
+    "patrol",
     "migration"
   ]
 }
